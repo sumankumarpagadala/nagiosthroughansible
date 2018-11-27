@@ -1,0 +1,23 @@
+- name: configure nagios plugin
+  command:
+    cmd: ./configure --with-nagios-user=nagios --with-nagios-group=nagios
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+- name: make nagios plugin
+  make:
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+    target: all
+- name: make install
+  make:
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+    target: install
+  become_user: root
+- name: httpd service
+  service:
+    name: httpd
+    enabled: yes
+    state: reloaded
+- name: nagios service
+  service:
+    name: nagios
+    enabled: yes
+    state: reloaded

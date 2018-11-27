@@ -1,0 +1,6 @@
+---
+# vars file for nagios
+nagios_user: nagios
+nagios_group: nagcmd
+nagios_password: p@55w0rd
+nagiosadmin_password: p@55w0rd

@@ -1,0 +1,133 @@
+---
+# tasks file for nagios
+- name: yum install httpd php gcc glibc glibc-comman gd gd-devel make net-snmp unzip wget -y
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop: 
+    - httpd
+    - php
+    - gcc
+    - glibc
+    - gd
+    - gd-devel
+    - make
+    - net-snmp
+    - unzip
+    - wget
+    - acl
+    - python-passlib
+- name: create a folder
+  file:
+    path: /tmp/nagios
+    state: directory
+- name: wget nagios core
+  get_url:
+    url: https://github.com/NagiosEnterprises/nagioscore/archive/nagios-4.4.2.tar.gz
+    dest: /tmp/nagios
+- name: wget nagios plugin
+  get_url:
+    url: https://nagios-plugins.org/download/nagios-plugins-2.2.1.tar.gz
+    dest: /tmp/nagios
+- name: unarchive nagios core
+  unarchive:
+    src: /tmp/nagios/nagioscore-nagios-4.4.2.tar.gz
+    dest: /tmp/nagios/
+    remote_src: yes
+- name: unarchive nagios plugin
+  unarchive:
+    src: /tmp/nagios/nagios-plugins-2.2.1.tar.gz
+    dest: /tmp/nagios/
+    remote_src: yes
+- name: Ensure group "nagcmd" exists
+  group:
+    name: "{{ nagios_group }}"
+    state: present
+- name: useradd nagios and Adding to nagcmd group
+  user:
+    name: "{{ nagios_user }}"
+    state: present
+    password: "{{ nagios_password | password_hash('sha512') }}"
+    groups: "{{ nagios_group }}"
+    append: yes
+- name: Adding apache to nagcmd group
+  user:
+    name: apache
+    groups: "{{ nagios_group }}"
+    append: yes
+- name: configure nagios core
+  command:
+    cmd: ./configure --with-command-group=nagcmd
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+- name: make nagios
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: all
+- name: make install
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: install
+  become_user: root
+- name: make install-init
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: install-init
+- name: make install-commandmode
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: install-commandmode
+- name: make install-config
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: install-config
+- name: make install-webconf
+  make:
+    chdir: /tmp/nagios/nagioscore-nagios-4.4.2
+    target: install-webconf
+- name: creating htpasswd.users
+  file:
+    path : /usr/local/nagios/etc/htpasswd.users
+    state: touch
+- name: password for user nagiosadmin
+  htpasswd:
+    path: /usr/local/nagios/etc/htpasswd.users
+    name: nagiosadmin
+    password: "{{ nagiosadmin_password }}"
+    crypt_scheme: apr_md5_crypt
+    state: present
+  notify:
+    - restart apache
+    - restart nagios
+- name: firewall
+  firewalld:
+    service: https
+    permanent: yes
+    state: enabled
+    zone: public
+- name: firewall
+  firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+    zone: public 
+- name: firewall
+  service:
+    name: firewalld
+    enabled: no
+    state: reloaded
+- name: configure nagios plugin
+  command:
+    cmd: ./configure --with-nagios-user=nagios --with-nagios-group=nagios
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+- name: make nagios plugin
+  make:
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+    target: all
+- name: make install
+  make:
+    chdir: /tmp/nagios/nagios-plugins-2.2.1
+    target: install
+  become_user: root
+  notify:
+  - restart apache
+  - restart nagios
